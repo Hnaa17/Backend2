@@ -1,18 +1,11 @@
-const { createClient } = require('redis');
+// const redis = require('redis');
 
-const client = redis.createClient({
-    url: 'redis://redis:6379'
-});
+// const client = redis.createClient({
+//     url: 'redis://redis:6379'
+// });
 
-client.connect();
+// client.on('error', (err) => console.log('Redis Client Error', err));
 
-client.on('connect', (err) => {
-    if(err) throw err;
-    else console.log('Redis Connected..!');
-});
+// client.connect();
 
-client.on('error', (err) => console.log('Redis Client Error', err));
-
-client.connect();
-
-module.exports = client
+// module.exports = client;

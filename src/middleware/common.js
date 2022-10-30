@@ -17,7 +17,7 @@ const validate = (req, res, next) => {
 //     response.setHeader('Access-Control-Headers', 'Content-Type');
 // } //ngeset header mana aja yang kita beri akses / mana aja yg boleh digunain /
   
-module.exports = {
-    validate,
-    // myCors
-}
+// module.exports = {
+//     validate,
+//     // myCors
+// }

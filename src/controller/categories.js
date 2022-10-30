@@ -1,7 +1,6 @@
-const categoriesModel = require('../models/categories');
+const categoriesModel = require('../models/categories')
 const createError = require('http-errors');
 const commonHelper = require('../helper/common');
-const client = require('../config/redis');
 
 const categoriesController = {
     getAllCategories: async (req, res) => {
@@ -9,10 +8,17 @@ const categoriesController = {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 5;
             const offset = (page - 1) * limit;
-            const sortby = req.query.sortby || ('category_name');
-            const sort = req.query.sort || 'ASC' || 'DESC';
+            const sortby = req.query.sortby || 'category_name';
+            const sort = req.query.sort || 'ASC';
             console.log(sort);
-            const result = await categoriesModel.selectAll({limit, offset, sortby, sort});
+            const search = req.query.search || '';
+            let querySearch = '';
+            if (search === undefined) {
+              querySearch = ``;
+            } else {
+              querySearch = ` where category_name like '%${search}%' `;
+            }
+            const result = await categoriesModel.selectAll({limit, offset, sort, sortby, querySearch});
             const {rows:[count]} = await categoriesModel.countCategories();
             const totalData = parseInt(count.count);
             const totalPage = Math.ceil(totalData/limit);
@@ -27,18 +33,11 @@ const categoriesController = {
             res.send(createError(404));
         }
     },
-    search: (req, res) => {
-        const search = req.query.search ||"";
-        categoriesModel.searching(search)
-        .then(result => res.json(result.rows))
-        .catch(err => res.send(err));
-    },
     getCategories: async (req, res) => {
         const id = Number(req.params.id);
         categoriesModel.selectCategories(id)
           .then(
             result => {
-            client.setEx(`categories/${id}`,60*60,JSON.stringify(result.rows))
             commonHelper.response(res, result.rows, 200, "get data success from database")
             }
           )

@@ -1,20 +1,54 @@
-const {selectAll,select,insert,update,deleteProducts,countProducts,searching,findId} = require('../models/products')
+const {searchKeywordsProduct, selectAll, selectPaginationTotal, select, insert, update, deleteProducts, countProducts, findId} = require('../models/products')
 const createError = require('http-errors');
 const commonHelper = require('../helper/common');
-const client = require('../config/redis');
+const { success, failed } = require('../helper/response')
+const { v4: uuidv4 } = require('uuid');
+// const client = require('../config/redis');
 
 const productsController = {
+    searchProduct: async(req, res) => {
+      try{
+        const keywords = "" || req.query.keyword;
+        const result = await searchKeywordsProduct(keywords);
+        success(res, {
+          code: 200,
+          status: 'success',
+          message: `Success get product`,
+          data: result.rows,
+        });
+      }catch (error) {
+        failed(res, {
+          code: 404,
+          status: 'error',
+          message: `product with that keywords is not found`,
+          error: [],
+        });
+      }
+    },
+
     getAllProducts: async (req, res) => {
         try {
-            const page = parseInt(req.query.page) || 1;
-            const limit = parseInt(req.query.limit) || 5;
+            const page = parseInt(req.query.page) || 1 ;
+            const limit = parseInt(req.query.limit) || 10 ;
             const offset = (page - 1) * limit;
-            const sortby = req.query.sortby || ('product_name') || ('price');
-            const sort = req.query.sort || 'ASC' || 'DESC';
-            console.log(sort);
-            const result = await selectAll({limit, offset, sortby, sort});
-            const {rows:[count]} = await countProducts();
-            const totalData = parseInt(count.count);
+
+            const search = req.query.search  || '';
+            let querySearch = '';
+            if (search === undefined) {
+              querySearch = ``;
+            } else {
+              querySearch = `where product_name ilike '%${search}%' `;
+            }
+
+            const sortby = req.query.sortby || 'product_name';
+            const sort = req.query.sort || 'ASC';
+            // console.log(sort);
+
+            const result = await selectAll({limit, offset, sort, sortby, querySearch});
+            const resultTotal = await selectPaginationTotal({querySearch});
+            const totalData = parseInt(resultTotal.rowCount);
+            // const {rows:[count]} = await countProducts();
+            // const totalData = parseInt(count.count);
             const totalPage = Math.ceil(totalData / limit);
             const pagination = {
                 page: page,
@@ -22,108 +56,126 @@ const productsController = {
                 totalData: totalData,
                 totalPage: totalPage
                 }
-            commonHelper.response(res, result.rows, 200, "Get data success", pagination)
+                success(res, {
+                  code: 200,
+                  status: 'success',
+                  message: 'Success get all products',
+                  data: result.rows,
+                  pagination: pagination
+                });
         } catch (error) {
-            res.send(createError(404));
+            console.log(error);
         }
     },
-    search: (req, res) => {
-        const search = req.query.search ||"";
-        searching(search)
-        .then(result => res.json(result.rows))
-        .catch(err => res.send(err));
+    getProducts: async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await select(id);
+        if (result.rowCount > 0) {
+          success(res, {
+            code: 200,
+            status: 'success',
+            message: 'Success get users by id',
+            data: result.rows[0],
+          });
+        } else {
+          failed(res, {
+            code: 404,
+            status: 'error',
+            message: `product with id ${id} is not found`,
+            error: [],
+          });
+        }
+      } catch (error) {
+        failed(res, {
+          code: 500,
+          status: 'error',
+          message: error.message,
+          error: [],
+        });
+      }
     },
-    getProducts: (req, res) => {
-        const id = Number(req.params.id);
-        select(id)
-          .then(
-            result => {
-            client.setEx(`products/${id}`,60*60,JSON.stringify(result.rows))
-            commonHelper.response(res, result.rows, 200, "get data success from database")
-            }
-          )
-          .catch(err => res.send(err)
-          )
-    },
-    insertProducts: async (req, res) => {
-        const PORT = process.env.DB_PORT || 8000
-        const DB_HOST = process.env.DB_HOST || 'localhost'
-        const photo = req.file.fieldname;
-        const {product_name, category_id, size, color, price, stock, descript, seller_id, product_rating, product_condition} = req.body;
-        const {rows: [count]} = await countProducts()
-        const id = Number(count.count)+1;
     
-        const data ={
-          id,
-          product_name, 
-          category_id, 
-          size, 
-          color, 
-          price, 
-          stock, 
-          photo:`http://${DB_HOST}:${PORT}/img/${photo}`, 
-          descript, 
-          seller_id, 
-          product_rating, 
-          product_condition
-        }
-        insert(data)
-          .then(
-            result => commonHelper.response(res, result.rows, 201, "Product created")
-          )
-          .catch(err => res.send(err)
-          )
+    insertProducts: async (req, res) => {
+      try {
+        const {product_name, seller_id, price, size, stock, category_id, product_condition, descript} = req.body;
+        // const id = uuidv4().toLocaleLowerCase();
+        const photo = req.file.filename;
+
+        await insert(product_name, seller_id, price, size, stock, photo, category_id, product_condition, descript)
+
+        success(res, {
+          code: 200,
+          status: 'success',
+          message: 'new product has been created',
+        });
+
+      } catch (error) {
+        failed(res, {
+          code: 500,
+          status: 'error',
+          message: error,
+          error: [],
+        });
+      }
     },
-    updateProduct: async (req, res) => {
-        try{
-            const PORT = process.env.DB_PORT || 8000
-            const DB_HOST = process.env.DB_HOST || 'localhost'
-            const id = Number(req.params.id)
-            const photo = req.file.fieldname;
-            const {product_name, category_id, size, color, price, stock, descript, seller_id, product_rating, product_condition} = req.body
-            const {rowCount} = await findId(id)
-            if(!rowCount){
-              return next(createError(403,"ID is Not Found"))
-            }
-            const data ={
-              id,
-              product_name, 
-              category_id, 
-              size, 
-              color, 
-              price, 
-              stock, 
-              photo:`http://${DB_HOST}:${PORT}/img/${photo}`, 
-              descript, 
-              seller_id, 
-              product_rating, 
-              product_condition
-            }
-            update(data)
-              .then(
-                result => commonHelper.response(res, result.rows, 200, "Product updated")
-                )
-                .catch(err => res.send(err)
-                )
-              }catch(error){
-                console.log(error);
-              }
+
+    updateProduct: async (req, res, next) => {
+      const { id } = req.params;
+      const {product_name, seller_id, price, size, stock, category_id, product_condition, descript} = req.body;
+      const photo = req.file.filename;
+      const {rowCount} = await findId(id)
+      if(!rowCount){
+        return next(createError(403,"ID is Not Found"))
+      }
+      await update(
+        id,
+        product_name, 
+        seller_id, 
+        price,  
+        size, 
+        stock, 
+        photo,
+        category_id, 
+        product_condition, 
+        descript
+      )
+      .then(
+        result => commonHelper.response(res, result.rows, 200, "Product updated")
+      )
+      .catch(err => res.send(err)
+      )
     },
-    deleteProduct: async (req, res, next) => {
+
+    deleteProduct: async (req, res) => {
         try{
-            const id = Number(req.params.id)
-            const {rowCount} = await findId(id)
-            if(!rowCount){
-              return next(createError(403,"ID is Not Found"))
+            const { id } = req.params;
+            const detailProduct = await select(id);
+            if (detailProduct.rowCount > 0) {
+              await deleteProducts(id);
+              success(res, {
+                code: 200,
+                status: 'success',
+                message: `success deleted product with id ${id}`,
+                error: [],
+              });
+              return;
+            } else {
+              failed(res, {
+                code: 404,
+                status: 'error',
+                message: `product with id ${id} is not found`,
+                error: [],
+              });
+              return;
             }
-            deleteProducts(id)
-              .then(
-                result => commonHelper.response(res, result.rows, 200, "Product deleted")
-              )
-              .catch(err => res.send(err)
-              )
           }catch(error){
-              console.log(error);
+            failed(res, {
+              code: 500,
+              status: 'error',
+              message: error.message,
+              error: [],
+            });
           }
     }
 }

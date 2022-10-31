@@ -36,8 +36,8 @@ const insert = (product_name, seller_id, price, size, stock, photo, category_id,
     return Pool.query(`INSERT INTO products (product_name, seller_id, price, size, stock, photo, category_id, product_condition, descript) VALUES ('${product_name}', ${seller_id}, ${price}, '${size}', ${stock}, '${photo}', ${category_id}, '${product_condition}', '${descript}')`);
 }
 
-const update = (id, product_name, seller_id, price, size, stock, photo, category_id, product_condition, descript) => {
-    return Pool.query(`UPDATE products SET product_name='${product_name}', seller_id=${seller_id}, price=${price}, size='${size}', stock=${stock}, photo='${photo}', category_id=${category_id}, product_condition='${product_condition}', descript='${descript}' WHERE id=${id}`);
+const update = (id, product_name, price, size, stock, product_condition, descript) => {
+    return Pool.query(`UPDATE products SET product_name='${product_name}', price=${price}, size='${size}', stock=${stock}, product_condition='${product_condition}', descript='${descript}' WHERE id=${id}`);
 }
 
 const deleteProducts = (id) => {

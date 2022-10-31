@@ -122,8 +122,9 @@ const productsController = {
 
     updateProduct: async (req, res, next) => {
       const { id } = req.params;
-      const {product_name, seller_id, price, size, stock, category_id, product_condition, descript} = req.body;
-      const photo = req.file.filename;
+      // const {product_name, seller_id, price, size, stock, category_id, product_condition, descript} = req.body;
+      const {product_name, price, size, stock, product_condition, descript} = req.body;
+      // const photo = req.file.filename;
       const {rowCount} = await findId(id)
       if(!rowCount){
         return next(createError(403,"ID is Not Found"))
@@ -131,12 +132,9 @@ const productsController = {
       await update(
         id,
         product_name, 
-        seller_id, 
         price,  
         size, 
         stock, 
-        photo,
-        category_id, 
         product_condition, 
         descript
       )
